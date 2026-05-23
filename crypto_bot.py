@@ -24,7 +24,7 @@ TELEGRAM_CHAT  = os.getenv("TELEGRAM_CHAT_ID")
 # ─────────────────────────────────────────────
 
 BASE_URL       = "https://testnet.binancefuture.com"  # Change to https://fapi.binance.com for live
-CAPITAL_USDT   = 10.0
+CAPITAL_USDT   = 50.0
 LEVERAGE       = 10
 SCAN_INTERVAL  = 60 * 15
 TRAIL_INTERVAL = 60 * 1
