@@ -1,0 +1,4 @@
+groq
+tavily-python
+requests
+python-dotenv
