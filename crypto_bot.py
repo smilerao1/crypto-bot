@@ -58,7 +58,7 @@ TRAIL_ACTIVATE_PCT = 0.008   # was 0.005 — wait for more profit before trailin
 TRAIL_DISTANCE_PCT = 0.005   # was 0.003 — give trade more room
 
 # Max trade duration — auto close if stuck too long
-MAX_TRADE_HOURS = 3   # was 4 — exit faster if stuck
+MAX_TRADE_HOURS = 4   # was 4 — exit faster if stuck
 
 # Trade log CSV file
 LOG_FILE = "trade_log.csv"
