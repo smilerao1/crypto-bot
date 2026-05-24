@@ -1358,7 +1358,8 @@ def run_bot():
                             best["symbol"], best["direction"]
                         )
                         if not vol_ok:
-                            print(f"  ⚠️  Weak volume — proceeding with reduced size")
+                            print(f"  ❌ Weak volume — BLOCKING trade")
+    approved = False
 
                     # ── FILTER 6: CANDLE PATTERNS ──
                     pattern_name = "None"
