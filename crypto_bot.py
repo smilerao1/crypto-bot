@@ -24,7 +24,7 @@ TELEGRAM_CHAT  = os.getenv("TELEGRAM_CHAT_ID")
 # ─────────────────────────────────────────────
 
 BASE_URL       = "https://testnet.binancefuture.com"  # Change to https://fapi.binance.com for live
-CAPITAL_USDT   = 10.0
+CAPITAL_USDT   = 50.0
 LEVERAGE       = 10
 SCAN_INTERVAL  = 60 * 15
 TRAIL_INTERVAL = 60 * 1
@@ -33,7 +33,7 @@ TOP_COINS      = 20
 RSI_OVERSOLD             = 32   # slightly looser
 RSI_OVERBOUGHT           = 68   # slightly looser
 MIN_VOLUME_USDT          = 5_000_000  # lower volume requirement
-MIN_TIMEFRAMES_AGREE     = 2    # 2 out of 3 timeframes must agree
+MIN_TIMEFRAMES_AGREE     = 3    # 2 out of 3 timeframes must agree
 SENTIMENT_CONFIDENCE_MIN = 60
 
 # Only trade quality coins — NO micro caps!
