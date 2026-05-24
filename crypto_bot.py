@@ -5,8 +5,6 @@ import json
 import requests
 import hmac
 import hashlib
-import gspread
-from google.oauth2.service_account import Credentials
 from groq import Groq
 from tavily import TavilyClient
 from dotenv import load_dotenv
@@ -20,160 +18,6 @@ groq           = Groq(api_key=os.getenv("GROQ_API_KEY"))
 tavily         = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT  = os.getenv("TELEGRAM_CHAT_ID")
-SHEET_ID       = os.getenv("GOOGLE_SHEET_ID")
-
-# ─────────────────────────────────────────────
-# GOOGLE SHEETS SETUP
-# ─────────────────────────────────────────────
-
-def get_sheet():
-    """Connect to Google Sheets"""
-    try:
-        # Try loading from file first (local), then from env variable (cloud)
-        if os.path.exists("credentials.json"):
-            creds = Credentials.from_service_account_file(
-                "credentials.json",
-                scopes=[
-                    "https://spreadsheets.google.com/feeds",
-                    "https://www.googleapis.com/auth/drive"
-                ]
-            )
-        else:
-            # Load from environment variable for Railway
-            creds_json = os.getenv("GOOGLE_CREDENTIALS")
-            if not creds_json:
-                print("  ⚠️  No Google credentials found")
-                return None
-            creds_dict = json.loads(creds_json)
-            creds = Credentials.from_service_account_info(
-                creds_dict,
-                scopes=[
-                    "https://spreadsheets.google.com/feeds",
-                    "https://www.googleapis.com/auth/drive"
-                ]
-            )
-        client = gspread.authorize(creds)
-        sheet  = client.open_by_key(SHEET_ID).sheet1
-        return sheet
-    except Exception as e:
-        print(f"  Google Sheets error: {e}")
-        return None
-
-def init_google_sheet():
-    """Add headers to sheet if empty"""
-    try:
-        sheet = get_sheet()
-        if not sheet:
-            return
-        # Check if headers exist
-        first_row = sheet.row_values(1)
-        if not first_row:
-            sheet.append_row([
-                "date", "time", "symbol", "direction",
-                "entry_price", "stop_loss", "take_profit",
-                "quantity", "capital_usdt", "leverage",
-                "tf_agreement", "sentiment", "news_confidence",
-                "outcome", "exit_price", "pnl_usdt", "pnl_pct",
-                "duration_mins", "exit_reason"
-            ])
-            print(" 📊 Google Sheet initialized!")
-        else:
-            print(" 📊 Google Sheet connected!")
-    except Exception as e:
-        print(f"  Sheet init error: {e}")
-
-def sheet_log_trade_open(trade):
-    """Log open trade to Google Sheet"""
-    try:
-        sheet = get_sheet()
-        if not sheet:
-            return
-        now = datetime.now()
-        sheet.append_row([
-            now.strftime("%Y-%m-%d"),
-            now.strftime("%H:%M:%S"),
-            trade.get("symbol"),
-            trade.get("direction"),
-            trade.get("entry_price"),
-            trade.get("stop_loss"),
-            trade.get("take_profit"),
-            trade.get("quantity"),
-            CAPITAL_USDT,
-            LEVERAGE,
-            trade.get("tf_agreement", "3/3"),
-            trade.get("sentiment", "UNKNOWN"),
-            trade.get("news_confidence", 0),
-            "OPEN", "", "", "", "", ""
-        ])
-        print(f"  📊 Trade logged to Google Sheet!")
-    except Exception as e:
-        print(f"  Sheet log error: {e}")
-
-def sheet_log_trade_close(symbol, exit_price, entry_price, direction, quantity, open_time, exit_reason):
-    """Update trade row with close details"""
-    try:
-        sheet = get_sheet()
-        if not sheet:
-            return 0, 0, "UNKNOWN", 0
-
-        if direction == "LONG":
-            pnl_pct  = (exit_price - entry_price) / entry_price * 100 * LEVERAGE
-            pnl_usdt = (exit_price - entry_price) * quantity
-        else:
-            pnl_pct  = (entry_price - exit_price) / entry_price * 100 * LEVERAGE
-            pnl_usdt = (entry_price - exit_price) * quantity
-
-        outcome  = "WIN" if pnl_usdt > 0 else "LOSS"
-        duration = int((datetime.now() - open_time).total_seconds() / 60)
-
-        # Find the OPEN row for this symbol and update it
-        cell = sheet.find("OPEN")
-        if cell:
-            row = cell.row
-            sheet.update(f"N{row}:S{row}", [[
-                outcome,
-                round(exit_price, 6),
-                round(pnl_usdt, 4),
-                round(pnl_pct, 2),
-                duration,
-                exit_reason
-            ]])
-            print(f"  📊 Trade result saved to Google Sheet!")
-
-        return pnl_usdt, pnl_pct, outcome, duration
-
-    except Exception as e:
-        print(f"  Sheet close error: {e}")
-        return 0, 0, "UNKNOWN", 0
-
-def sheet_print_stats():
-    """Print stats from Google Sheet"""
-    try:
-        sheet = get_sheet()
-        if not sheet:
-            return
-        records = sheet.get_all_records()
-        wins = losses = 0
-        total_pnl = 0.0
-        for row in records:
-            if row.get("outcome") == "WIN":
-                wins += 1
-                total_pnl += float(row.get("pnl_usdt") or 0)
-            elif row.get("outcome") == "LOSS":
-                losses += 1
-                total_pnl += float(row.get("pnl_usdt") or 0)
-        total = wins + losses
-        if total == 0:
-            return
-        win_rate = (wins / total) * 100
-        print(f"\n 📊 STATS: {total} trades | Win rate: {win_rate:.0f}% | Total PnL: ${total_pnl:+.2f}")
-        send_telegram(
-            f"📊 <b>Bot Stats</b>\n"
-            f"Trades: {total} | Win Rate: {win_rate:.0f}%\n"
-            f"Total PnL: ${total_pnl:+.2f}"
-        )
-    except Exception as e:
-        print(f"  Stats error: {e}")
 
 # ─────────────────────────────────────────────
 # CONFIG
@@ -210,14 +54,11 @@ WHITELIST = [
     "ZILUSDT", "CHZUSDT", "ENJUSDT", "BATUSDT", "1INCHUSDT"
 ]
 
-TRAIL_ACTIVATE_PCT = 0.008   # was 0.005 — wait for more profit before trailing
-TRAIL_DISTANCE_PCT = 0.005   # was 0.003 — give trade more room
+TRAIL_ACTIVATE_PCT = 0.008
+TRAIL_DISTANCE_PCT = 0.005
 
-# Max trade duration — auto close if stuck too long
-MAX_TRADE_HOURS = 3   # was 4 — exit faster if stuck
-
-# Trade log CSV file
-LOG_FILE = "trade_log.csv"
+# Max trade duration
+MAX_TRADE_HOURS = 3
 
 # ─────────────────────────────────────────────
 # TELEGRAM ALERTS
@@ -1283,18 +1124,8 @@ def place_trade(signal, sentiment="UNKNOWN", news_confidence=0, capital_override
     })
     print(f"  Take Profit set @ ${tp_price:.4f}")
 
-    # Log trade open to Google Sheet
-    sheet_log_trade_open({
-        "symbol":          symbol,
-        "direction":       direction,
-        "entry_price":     price,
-        "stop_loss":       sl_price,
-        "take_profit":     tp_price,
-        "quantity":        quantity,
-        "tf_agreement":    f"{signal.get('agreements', 3)}/3",
-        "sentiment":       sentiment,
-        "news_confidence": news_confidence
-    })
+    # Log trade open to Railway logs
+    print(f"  📊 TRADE OPEN | {symbol} {direction} | Entry: ${price:.4f} | SL: ${sl_price:.4f} | TP: ${tp_price:.4f}")
 
     # Telegram alert
     send_telegram(
@@ -1316,7 +1147,7 @@ def place_trade(signal, sentiment="UNKNOWN", news_confidence=0, capital_override
 # ─────────────────────────────────────────────
 
 def run_bot():
-    init_google_sheet()
+    print(" 📊 Trade log: Railway logs only")
 
     print("=" * 60)
     print("   BINANCE FUTURES BOT - FULL v8")
@@ -1326,7 +1157,7 @@ def run_bot():
     print(f"   Capital    : ${CAPITAL_USDT} USDT | Leverage: {LEVERAGE}x")
     print(f"   Timeframes : 15m + 1h + 4h (need {MIN_TIMEFRAMES_AGREE}/3)")
     print(f"   Trail SL   : activates at +{TRAIL_ACTIVATE_PCT*100:.1f}%, trails {TRAIL_DISTANCE_PCT*100:.1f}%")
-    print(f"   Trade Log  : {LOG_FILE}")
+    print(f"   Trade Log  : Railway Logs")
     print(f"   Mode       : {'TESTNET' if 'testnet' in BASE_URL else '🔴 LIVE'}")
     print(f"   Started    : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
@@ -1399,15 +1230,20 @@ def run_bot():
                 except:
                     exit_price = trail_manager.entry_price
 
-                pnl_usdt, pnl_pct, outcome, duration = sheet_log_trade_close(
-                    symbol      = trail_manager.symbol,
-                    exit_price  = exit_price,
-                    entry_price = trail_manager.entry_price,
-                    direction   = trail_manager.direction,
-                    quantity    = trail_manager.qty,
-                    open_time   = trail_manager.open_time,
-                    exit_reason = "SL/TP/Manual"
-                )
+                direction   = trail_manager.direction
+                quantity    = trail_manager.qty
+                entry_price = trail_manager.entry_price
+                open_time   = trail_manager.open_time
+
+                if direction == "LONG":
+                    pnl_usdt = (exit_price - entry_price) * quantity
+                    pnl_pct  = (exit_price - entry_price) / entry_price * 100 * LEVERAGE
+                else:
+                    pnl_usdt = (entry_price - exit_price) * quantity
+                    pnl_pct  = (entry_price - exit_price) / entry_price * 100 * LEVERAGE
+
+                outcome  = "WIN" if pnl_usdt > 0 else "LOSS"
+                duration = int((datetime.now() - open_time).total_seconds() / 60) if open_time else 0
 
                 result_emoji = "✅ WIN" if outcome == "WIN" else "❌ LOSS"
                 print(f" {result_emoji} | PnL: ${pnl_usdt:+.4f} ({pnl_pct:+.2f}%) | Duration: {duration}m")
@@ -1423,7 +1259,7 @@ def run_bot():
                 )
 
                 trail_manager.reset()
-                sheet_print_stats()
+                print(f" 📊 Check Railway logs for trade history")
 
         # ── FULL SCAN (every 15 min) ──
         if now - last_scan >= SCAN_INTERVAL:
