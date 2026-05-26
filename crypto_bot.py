@@ -24,16 +24,16 @@ TELEGRAM_CHAT  = os.getenv("TELEGRAM_CHAT_ID")
 # ─────────────────────────────────────────────
 
 BASE_URL       = "https://testnet.binancefuture.com"  # Change to https://fapi.binance.com for live
-CAPITAL_USDT   = 50.0
+CAPITAL_USDT   = 100.0
 LEVERAGE       = 10
 SCAN_INTERVAL  = 60 * 15
 TRAIL_INTERVAL = 60 * 1
 TOP_COINS      = 20
 
-RSI_OVERSOLD             = 32   # slightly looser
-RSI_OVERBOUGHT           = 68   # slightly looser
-MIN_VOLUME_USDT          = 5_000_000  # lower volume requirement
-MIN_TIMEFRAMES_AGREE     = 3    # 2 out of 3 timeframes must agree
+RSI_OVERSOLD             = 35   # looser
+RSI_OVERBOUGHT           = 65   # looser
+MIN_VOLUME_USDT          = 5_000_000
+MIN_TIMEFRAMES_AGREE     = 3    # 3/3 required
 SENTIMENT_CONFIDENCE_MIN = 60
 
 # Only trade quality coins — NO micro caps!
@@ -827,7 +827,7 @@ def check_near_sr(symbol, direction, current_price):
         print(f"  📍 S/R: Could not detect levels — allowing trade")
         return True, None
 
-    SR_ZONE_PCT = 0.008  # within 0.8% of S/R level counts as "near"
+    SR_ZONE_PCT = 0.015  # within 1.5% of S/R level
 
     nearest_support    = None
     nearest_resistance = None
@@ -1349,9 +1349,11 @@ def run_bot():
                         vol_ok, volume_ratio = check_volume_confirmation(
                             best["symbol"], best["direction"]
                         )
-                        if not vol_ok:
-                            print(f"  ❌ Weak volume — BLOCKING trade")
+                        if not vol_ok and volume_ratio < 0.5:
+                            print(f"  ❌ Very weak volume ({volume_ratio:.2f}x) — BLOCKING")
                             approved = False
+                        elif not vol_ok:
+                            print(f"  ⚠️  Weak volume — proceeding with caution")
 
                     # ── FILTER 6: CANDLE PATTERNS ──
                     pattern_name = "None"
