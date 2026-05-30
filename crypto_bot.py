@@ -30,11 +30,11 @@ SCAN_INTERVAL  = 60 * 15
 TRAIL_INTERVAL = 60 * 1
 TOP_COINS      = 20
 
-RSI_OVERSOLD             = 35   # looser
-RSI_OVERBOUGHT           = 65   # looser
-MIN_VOLUME_USDT          = 5_000_000
-MIN_TIMEFRAMES_AGREE     = 3    # 3/3 required
-SENTIMENT_CONFIDENCE_MIN = 60
+RSI_OVERSOLD             = 25   # very extreme oversold only
+RSI_OVERBOUGHT           = 75   # very extreme overbought only
+MIN_VOLUME_USDT          = 10_000_000  # high volume only
+MIN_TIMEFRAMES_AGREE     = 3    # all 3 must agree
+SENTIMENT_CONFIDENCE_MIN = 70   # higher news confidence required
 
 # Only trade quality coins — NO micro caps!
 WHITELIST = [
@@ -54,11 +54,11 @@ WHITELIST = [
     "ZILUSDT", "CHZUSDT", "ENJUSDT", "BATUSDT", "1INCHUSDT"
 ]
 
-TRAIL_ACTIVATE_PCT = 0.008
-TRAIL_DISTANCE_PCT = 0.005
+TRAIL_ACTIVATE_PCT = 0.005  # activate sooner at 0.5%
+TRAIL_DISTANCE_PCT = 0.003  # tighter trail
 
 # Max trade duration
-MAX_TRADE_HOURS = 3
+MAX_TRADE_HOURS = 3  # close faster if stuck
 
 # ─────────────────────────────────────────────
 # TELEGRAM ALERTS
@@ -827,7 +827,7 @@ def check_near_sr(symbol, direction, current_price):
         print(f"  📍 S/R: Could not detect levels — allowing trade")
         return True, None
 
-    SR_ZONE_PCT = 0.015  # within 1.5% of S/R level
+    SR_ZONE_PCT = 0.005  # within 0.5% of S/R level only
 
     nearest_support    = None
     nearest_resistance = None
@@ -1349,11 +1349,9 @@ def run_bot():
                         vol_ok, volume_ratio = check_volume_confirmation(
                             best["symbol"], best["direction"]
                         )
-                        if not vol_ok and volume_ratio < 0.5:
-                            print(f"  ❌ Very weak volume ({volume_ratio:.2f}x) — BLOCKING")
+                        if not vol_ok:
+                            print(f"  ❌ Weak volume — BLOCKING trade")
                             approved = False
-                        elif not vol_ok:
-                            print(f"  ⚠️  Weak volume — proceeding with caution")
 
                     # ── FILTER 6: CANDLE PATTERNS ──
                     pattern_name = "None"
